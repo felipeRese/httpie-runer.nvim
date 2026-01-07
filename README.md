@@ -1,6 +1,6 @@
 # httpie-runner.nvim
 
-Neovim helper that lets you execute the `httpie` command written on the current line. It opens a fresh terminal split and streams the response so you can iterate on HTTP requests without leaving your editor.
+Neovim helper that lets you execute the `httpie` command written on the current line. It opens a fresh split (right side by default) and streams the response into a regular buffer so you can read, search, and yank the payload without leaving your editor.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ Write a regular `httpie` command (e.g. `http GET https://api.github.com`) on its
 - `:HttpieRun`
 - or map it, for example: `vim.keymap.set("n", "<leader>hr", "<cmd>HttpieRun<CR>", { desc = "Run httpie command" })`
 
-The plugin opens a terminal split on the right (`botright vsplit` by default), executes the command, and leaves the terminal in insert mode so you can interact with the process if needed.
+The plugin opens a scratch buffer on the right (`botright vsplit` by default), executes the command, and streams the response into it. Because the buffer behaves like any other Neovim window you can move around, search, and copy text immediately. Set `output = "terminal"` if you prefer to run inside a traditional terminal buffer.
 
 ## Environment variables
 
@@ -64,10 +64,11 @@ The surrounding brackets are stripped before running `httpie`, so the command re
 
 ```lua
 require("httpie_runner").setup({
-  split_cmd = "botright vsplit",  -- window command used before opening the terminal
-  start_insert = true,            -- jump into insert mode after spawning the terminal
-  termopen_opts = {},             -- forwarded to vim.fn.termopen (env, cwd, etc.)
+  split_cmd = "botright vsplit",  -- window command used before opening the output buffer
+  output = "buffer",              -- "buffer" (default) or "terminal"
+  start_insert = true,            -- only relevant when output = "terminal"
+  termopen_opts = {},             -- forwarded to the underlying job/terminal (env, cwd, etc.)
 })
 ```
 
-Setting `split_cmd = ""` (or `nil`) disables automatic window changes so the terminal reuses the current window.
+Setting `split_cmd = ""` (or `nil`) disables automatic window changes so the output reuses the current window.

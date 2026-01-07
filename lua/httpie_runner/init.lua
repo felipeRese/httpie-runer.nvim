@@ -2,6 +2,7 @@ local M = {}
 
 local defaults = {
   split_cmd = "botright vsplit",
+  output = "buffer",
   start_insert = true,
   termopen_opts = {},
 }
@@ -122,24 +123,67 @@ local function open_output_window()
   return buf
 end
 
+local function replace_buffer_lines(buf, start, finish, lines)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+
+  vim.bo[buf].modifiable = true
+  vim.api.nvim_buf_set_lines(buf, start, finish, false, lines)
+  vim.bo[buf].modifiable = false
+end
+
+local function append_to_buffer(buf, lines)
+  if not lines or #lines == 0 then
+    return
+  end
+
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+
+  local prev_lines = vim.api.nvim_buf_line_count(buf)
+
+  vim.bo[buf].modifiable = true
+  vim.api.nvim_buf_set_lines(buf, -1, -1, false, lines)
+  vim.bo[buf].modifiable = false
+
+  local new_line_count = vim.api.nvim_buf_line_count(buf)
+  local wins = vim.fn.win_findbuf(buf)
+  for _, win in ipairs(wins) do
+    local cursor = vim.api.nvim_win_get_cursor(win)
+    if cursor[1] >= prev_lines then
+      vim.api.nvim_win_set_cursor(win, { new_line_count, 0 })
+    end
+  end
+end
+
+local function sanitize_job_chunk(data, prefix)
+  if not data or vim.tbl_isempty(data) then
+    return {}
+  end
+
+  local sanitized = {}
+  for idx, value in ipairs(data) do
+    if value ~= "" then
+      if prefix and prefix ~= "" then
+        table.insert(sanitized, prefix .. value)
+      else
+        table.insert(sanitized, value)
+      end
+    elseif idx ~= #data then
+      table.insert(sanitized, "")
+    end
+  end
+
+  return sanitized
+end
+
 local function notify(msg, level)
   vim.notify("[httpie-runner] " .. msg, level or vim.log.levels.INFO)
 end
 
-function M.run_current_line()
-  ensure_config()
-
-  local bufnr = vim.api.nvim_get_current_buf()
-  local cursor = vim.api.nvim_win_get_cursor(0)
-  local line = vim.api.nvim_get_current_line()
-  local cmd = trim(line or "")
-  if cmd == "" then
-    notify("Current line is empty. Nothing to run.", vim.log.levels.WARN)
-    return
-  end
-
-  local final_cmd = command_with_env(cmd, bufnr, cursor[1])
-
+local function run_in_terminal(final_cmd)
   open_output_window()
 
   local opts = vim.tbl_deep_extend(
@@ -160,6 +204,112 @@ function M.run_current_line()
 
   if M.config.start_insert then
     vim.cmd("startinsert")
+  else
+    vim.cmd("stopinsert")
+  end
+end
+
+local function format_command_lines(final_cmd)
+  local lines = vim.split(final_cmd, "\n", { trimempty = true })
+  if vim.tbl_isempty(lines) then
+    return { "$ " .. final_cmd }
+  end
+
+  local formatted = {}
+  for _, line in ipairs(lines) do
+    if line ~= "" then
+      table.insert(formatted, "$ " .. line)
+    end
+  end
+
+  return formatted
+end
+
+local function run_in_buffer(final_cmd)
+  local buf = open_output_window()
+  vim.bo[buf].buftype = "nofile"
+  vim.bo[buf].modifiable = false
+
+  local header = format_command_lines(final_cmd)
+  table.insert(header, "")
+  replace_buffer_lines(buf, 0, -1, header)
+
+  local job_id
+
+  local job_opts = vim.tbl_deep_extend(
+    "force",
+    M.config.termopen_opts or {},
+    {
+      stdout_buffered = false,
+      stderr_buffered = false,
+    }
+  )
+
+  job_opts.on_stdout = function(_, data)
+    local lines = sanitize_job_chunk(data)
+    if #lines == 0 then
+      return
+    end
+
+    vim.schedule(function()
+      append_to_buffer(buf, lines)
+    end)
+  end
+
+  job_opts.on_stderr = function(_, data)
+    local lines = sanitize_job_chunk(data, "[stderr] ")
+    if #lines == 0 then
+      return
+    end
+
+    vim.schedule(function()
+      append_to_buffer(buf, lines)
+    end)
+  end
+
+  job_opts.on_exit = function(_, code)
+    vim.schedule(function()
+      append_to_buffer(buf, { "", ("[exit %d]"):format(code) })
+      if code ~= 0 then
+        notify(("Command exited with code %d"):format(code), vim.log.levels.ERROR)
+      end
+    end)
+  end
+
+  job_id = vim.fn.jobstart({ "sh", "-c", final_cmd }, job_opts)
+  if job_id <= 0 then
+    notify("Failed to start command.", vim.log.levels.ERROR)
+    return
+  end
+
+  vim.api.nvim_buf_attach(buf, false, {
+    on_detach = function()
+      if job_id > 0 then
+        pcall(vim.fn.jobstop, job_id)
+      end
+    end,
+  })
+end
+
+function M.run_current_line()
+  ensure_config()
+
+  local bufnr = vim.api.nvim_get_current_buf()
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local line = vim.api.nvim_get_current_line()
+  local cmd = trim(line or "")
+  if cmd == "" then
+    notify("Current line is empty. Nothing to run.", vim.log.levels.WARN)
+    return
+  end
+
+  local final_cmd = command_with_env(cmd, bufnr, cursor[1])
+
+  local mode = M.config.output or "buffer"
+  if mode == "terminal" then
+    run_in_terminal(final_cmd)
+  else
+    run_in_buffer(final_cmd)
   end
 end
 
