@@ -38,7 +38,7 @@ Write a regular `httpie` command (e.g. `http GET https://api.github.com`) on its
 - `:HttpieRun`
 - or map it, for example: `vim.keymap.set("n", "<leader>hr", "<cmd>HttpieRun<CR>", { desc = "Run httpie command" })`
 
-The plugin opens a terminal split (`botright 15split` by default), executes the command, and leaves the terminal in insert mode so you can interact with the process if needed.
+The plugin opens a terminal split on the right (`botright vsplit` by default), executes the command, and leaves the terminal in insert mode so you can interact with the process if needed.
 
 ## Environment variables
 
@@ -64,7 +64,7 @@ The surrounding brackets are stripped before running `httpie`, so the command re
 
 ```lua
 require("httpie_runner").setup({
-  split_cmd = "botright 15split", -- window command used before opening the terminal
+  split_cmd = "botright vsplit",  -- window command used before opening the terminal
   start_insert = true,            -- jump into insert mode after spawning the terminal
   termopen_opts = {},             -- forwarded to vim.fn.termopen (env, cwd, etc.)
 })

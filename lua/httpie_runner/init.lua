@@ -1,7 +1,7 @@
 local M = {}
 
 local defaults = {
-  split_cmd = "botright 15split",
+  split_cmd = "botright vsplit",
   start_insert = true,
   termopen_opts = {},
 }
