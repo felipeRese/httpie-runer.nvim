@@ -245,6 +245,11 @@ local function run_in_buffer(final_cmd)
     }
   )
 
+  if job_opts.stdin == nil then
+    -- Close STDIN so commands don't block waiting for input (httpie waits otherwise).
+    job_opts.stdin = "null"
+  end
+
   job_opts.on_stdout = function(_, data)
     local lines = sanitize_job_chunk(data)
     if #lines == 0 then
