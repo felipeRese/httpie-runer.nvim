@@ -68,7 +68,7 @@ require("httpie_runner").setup({
   output = "buffer",              -- "buffer" (default) or "terminal"
   start_insert = true,            -- only relevant when output = "terminal"
   termopen_opts = {},             -- forwarded to the underlying job/terminal (env, cwd, etc.)
-  httpie_opts = "--pretty=format",-- value assigned to HTTPIE_OPTIONS to keep output formatted
+  httpie_opts = "--pretty=format",-- options automatically inserted after the http/https command
 })
 ```
 
@@ -76,6 +76,6 @@ Setting `split_cmd = ""` (or `nil`) disables automatic window changes so the out
 
 ## Formatting & highlighting
 
-httpie disables its pretty printer whenever `stdout` isn't a TTY. Because httpie-runner streams everything into a scratch buffer, it injects `HTTPIE_OPTIONS=--pretty=format` by default so the payload stays nicely formatted without ANSI escape sequences. Override or disable it via the `httpie_opts` option if you prefer the raw output or want to provide a different set of flags (for example `--pretty=all --style=solarized`).
+httpie disables its pretty printer whenever `stdout` isn't a TTY. Because httpie-runner streams everything into a scratch buffer, it injects `--pretty=format` right after the `http`/`https` command by default so the payload stays nicely formatted without ANSI escape sequences. Override or disable it via the `httpie_opts` option if you prefer the raw output or want to provide a different set of flags (for example `--pretty=all --style=solarized`).
 
 The scratch buffer uses the `httpie-runner` filetype and ships with a small syntax definition so status lines, headers, stderr, and JSON snippets get highlighted automatically.

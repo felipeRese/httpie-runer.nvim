@@ -106,26 +106,42 @@ end
 local function merge_term_opts(overrides)
   ensure_config()
 
-  local opts = vim.tbl_deep_extend(
+  return vim.tbl_deep_extend(
     "force",
     vim.deepcopy(M.config.termopen_opts or {}),
     overrides or {}
   )
+end
+
+local function add_httpie_opts(cmd)
+  ensure_config()
 
   local httpie_opts = M.config.httpie_opts
-  if httpie_opts == false or httpie_opts == "" or type(httpie_opts) ~= "string" then
-    httpie_opts = nil
+  if type(httpie_opts) ~= "string" then
+    return cmd
   end
 
-  if httpie_opts then
-    local env = vim.tbl_deep_extend("force", {}, opts.env or {})
-    if env.HTTPIE_OPTIONS == nil then
-      env.HTTPIE_OPTIONS = httpie_opts
-    end
-    opts.env = env
+  httpie_opts = trim(httpie_opts)
+  if httpie_opts == "" then
+    return cmd
   end
 
-  return opts
+  local command, rest = cmd:match("^(%S+)%s*(.*)$")
+  if not command then
+    return cmd
+  end
+
+  local binary = command:lower()
+  if binary ~= "http" and binary ~= "https" then
+    return cmd
+  end
+
+  local pieces = { command, httpie_opts }
+  if rest ~= "" then
+    table.insert(pieces, rest)
+  end
+
+  return table.concat(pieces, " ")
 end
 
 function M.setup(opts)
@@ -326,6 +342,7 @@ function M.run_current_line()
     return
   end
 
+  cmd = add_httpie_opts(cmd)
   local final_cmd = command_with_env(cmd, bufnr, cursor[1])
 
   local mode = M.config.output or "buffer"
