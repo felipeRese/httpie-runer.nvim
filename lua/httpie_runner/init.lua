@@ -10,6 +10,52 @@ local function trim(s)
   return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+local function is_env_assignment(line)
+  if not line then
+    return false
+  end
+
+  if line:match("^%s*#") then
+    return false
+  end
+
+  if line:match("^%s*export%s+[A-Z_][A-Z0-9_]*%s*=") then
+    return true
+  end
+
+  if line:match("^%s*[A-Z_][A-Z0-9_]*%s*=") then
+    return true
+  end
+
+  return false
+end
+
+local function collect_env_assignments(bufnr, upto_line)
+  local env_lines = {}
+
+  if upto_line <= 1 then
+    return env_lines
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, upto_line - 1, false)
+  for _, line in ipairs(lines) do
+    if is_env_assignment(line) then
+      table.insert(env_lines, line)
+    end
+  end
+
+  return env_lines
+end
+
+local function command_with_env(cmd, bufnr, line_nr)
+  local env_lines = collect_env_assignments(bufnr, line_nr)
+  if #env_lines == 0 then
+    return cmd
+  end
+
+  return table.concat(env_lines, "\n") .. "\n" .. cmd
+end
+
 local function extend_opts(opts)
   return vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
 end
@@ -48,12 +94,16 @@ end
 function M.run_current_line()
   ensure_config()
 
+  local bufnr = vim.api.nvim_get_current_buf()
+  local cursor = vim.api.nvim_win_get_cursor(0)
   local line = vim.api.nvim_get_current_line()
   local cmd = trim(line or "")
   if cmd == "" then
     notify("Current line is empty. Nothing to run.", vim.log.levels.WARN)
     return
   end
+
+  local final_cmd = command_with_env(cmd, bufnr, cursor[1])
 
   open_output_window()
 
@@ -71,7 +121,7 @@ function M.run_current_line()
     }
   )
 
-  vim.fn.termopen({ "sh", "-c", cmd }, opts)
+  vim.fn.termopen({ "sh", "-c", final_cmd }, opts)
 
   if M.config.start_insert then
     vim.cmd("startinsert")
@@ -79,4 +129,3 @@ function M.run_current_line()
 end
 
 return M
-

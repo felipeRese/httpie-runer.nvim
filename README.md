@@ -40,6 +40,17 @@ Write a regular `httpie` command (e.g. `http GET https://api.github.com`) on its
 
 The plugin opens a terminal split (`botright 15split` by default), executes the command, and leaves the terminal in insert mode so you can interact with the process if needed.
 
+## Environment variables
+
+Define uppercase shell assignments anywhere above the command line (e.g. `BASE_URL=https://api.example.com` or `export TOKEN=abc`). httpie-runner prepends those statements before executing the request so you can interpolate values such as `$BASE_URL` without leaving Neovim.
+
+```http
+BASE_URL=https://api.github.com
+TOKEN="ghp_***"
+
+http GET $BASE_URL/user "Authorization:Bearer $TOKEN"
+```
+
 ## Configuration
 
 ```lua
@@ -51,4 +62,3 @@ require("httpie_runner").setup({
 ```
 
 Setting `split_cmd = ""` (or `nil`) disables automatic window changes so the terminal reuses the current window.
-
