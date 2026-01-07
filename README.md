@@ -51,6 +51,15 @@ TOKEN="ghp_***"
 http GET $BASE_URL/user "Authorization:Bearer $TOKEN"
 ```
 
+If you prefer to keep placeholder wrappers in markdown files (e.g. to make it clear that values need to be filled in), put them at the top of the file using square or curly brackets such as:
+
+```text
+BASE_URL=[http://localhost:8080}
+TOKEN={super-secret-token}
+```
+
+The surrounding brackets are stripped before running `httpie`, so the command receives plain `BASE_URL`/`TOKEN` values.
+
 ## Configuration
 
 ```lua

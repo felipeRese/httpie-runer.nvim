@@ -10,24 +10,58 @@ local function trim(s)
   return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
-local function is_env_assignment(line)
+local function unwrap_placeholder_value(value)
+  if not value or #value < 2 then
+    return value
+  end
+
+  local first = value:sub(1, 1)
+  local last = value:sub(-1)
+  local closing = {
+    ["["] = { "]", "}" },
+    ["{"] = { "}", "]" },
+    ["<"] = { ">" },
+  }
+
+  local expected = closing[first]
+  if not expected then
+    return value
+  end
+
+  for _, candidate in ipairs(expected) do
+    if last == candidate then
+      return trim(value:sub(2, #value - 1))
+    end
+  end
+
+  return value
+end
+
+local function parse_env_assignment(line)
   if not line then
-    return false
+    return nil
   end
 
-  if line:match("^%s*#") then
-    return false
+  local trimmed = trim(line)
+  if trimmed == "" or trimmed:match("^#") then
+    return nil
   end
 
-  if line:match("^%s*export%s+[A-Z_][A-Z0-9_]*%s*=") then
-    return true
+  local assignment = trimmed
+  local export_prefix = assignment:match("^export%s+(.+)$")
+  if export_prefix then
+    assignment = export_prefix
   end
 
-  if line:match("^%s*[A-Z_][A-Z0-9_]*%s*=") then
-    return true
+  local name, value = assignment:match("^([A-Z_][A-Z0-9_]*)%s*=%s*(.*)$")
+  if not name then
+    return nil
   end
 
-  return false
+  value = trim(value)
+  value = unwrap_placeholder_value(value)
+
+  return name .. "=" .. value
 end
 
 local function collect_env_assignments(bufnr, upto_line)
@@ -39,8 +73,9 @@ local function collect_env_assignments(bufnr, upto_line)
 
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, upto_line - 1, false)
   for _, line in ipairs(lines) do
-    if is_env_assignment(line) then
-      table.insert(env_lines, line)
+    local assignment = parse_env_assignment(line)
+    if assignment then
+      table.insert(env_lines, assignment)
     end
   end
 
