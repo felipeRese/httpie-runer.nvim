@@ -13,7 +13,7 @@ Neovim helper that lets you execute the `httpie` command written on the current 
 
 ```lua
 {
-  "felipecrs/httpie-runner.nvim",
+  "felipeRese/httpie-runner.nvim",
   config = function()
     require("httpie_runner").setup()
   end,
@@ -24,7 +24,7 @@ Neovim helper that lets you execute the `httpie` command written on the current 
 
 ```lua
 use({
-  "felipecrs/httpie-runner.nvim",
+  "felipeRese/httpie-runner.nvim",
   config = function()
     require("httpie_runner").setup()
   end,
