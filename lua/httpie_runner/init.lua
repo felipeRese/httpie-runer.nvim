@@ -5,6 +5,7 @@ local defaults = {
   output = "buffer",
   start_insert = true,
   termopen_opts = {},
+  httpie_opts = "--pretty=format",
 }
 
 local function trim(s)
@@ -102,6 +103,31 @@ local function ensure_config()
   end
 end
 
+local function merge_term_opts(overrides)
+  ensure_config()
+
+  local opts = vim.tbl_deep_extend(
+    "force",
+    vim.deepcopy(M.config.termopen_opts or {}),
+    overrides or {}
+  )
+
+  local httpie_opts = M.config.httpie_opts
+  if httpie_opts == false or httpie_opts == "" or type(httpie_opts) ~= "string" then
+    httpie_opts = nil
+  end
+
+  if httpie_opts then
+    local env = vim.tbl_deep_extend("force", {}, opts.env or {})
+    if env.HTTPIE_OPTIONS == nil then
+      env.HTTPIE_OPTIONS = httpie_opts
+    end
+    opts.env = env
+  end
+
+  return opts
+end
+
 function M.setup(opts)
   M.config = extend_opts(opts)
 end
@@ -186,19 +212,15 @@ end
 local function run_in_terminal(final_cmd)
   open_output_window()
 
-  local opts = vim.tbl_deep_extend(
-    "force",
-    M.config.termopen_opts or {},
-    {
-      on_exit = function(_, code)
-        if code ~= 0 then
-          vim.schedule(function()
-            notify(("Command exited with code %d"):format(code), vim.log.levels.ERROR)
-          end)
-        end
-      end,
-    }
-  )
+  local opts = merge_term_opts({
+    on_exit = function(_, code)
+      if code ~= 0 then
+        vim.schedule(function()
+          notify(("Command exited with code %d"):format(code), vim.log.levels.ERROR)
+        end)
+      end
+    end,
+  })
 
   vim.fn.termopen({ "sh", "-c", final_cmd }, opts)
 
@@ -236,14 +258,10 @@ local function run_in_buffer(final_cmd)
 
   local job_id
 
-  local job_opts = vim.tbl_deep_extend(
-    "force",
-    M.config.termopen_opts or {},
-    {
-      stdout_buffered = false,
-      stderr_buffered = false,
-    }
-  )
+  local job_opts = merge_term_opts({
+    stdout_buffered = false,
+    stderr_buffered = false,
+  })
 
   if job_opts.stdin == nil then
     -- Close STDIN so commands don't block waiting for input (httpie waits otherwise).
